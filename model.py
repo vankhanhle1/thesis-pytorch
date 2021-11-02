@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from helpers import AllAP, ConvBlock, euclidean_similarity_score
+from network_helpers import AllAP, ConvBlock, euclidean_similarity_score
 
 
 class ABCNN(nn.Module):
