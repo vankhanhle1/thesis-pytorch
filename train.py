@@ -58,12 +58,12 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
             labels = labels.to(device)
 
             predictions, features = model(x0, x1)
-            if include_additional_features:
-                features = torch.cat((features, additional_features), 1)
             if device == "cpu":
                 features_for_svm = features.detach().numpy()
             else:
                 features_for_svm = features.cpu().detach().numpy()
+            if include_additional_features:
+                features_for_svm = np.concatenate((features_for_svm, additional_features), axis=1)
 
             svm_features_list.append(features_for_svm)
             if device != "cpu":
@@ -96,8 +96,6 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
 
         SVM.fit(svm_features, svm_labels)
         train_logits = SVM.predict(svm_features)
-        print('predict', train_logits)
-        print('truth', svm_labels)
         epoch_train_accuracy, epoch_train_f1_0, epoch_train_f1_1 = metrics_sklearn(train_logits, svm_labels)
 
         joblib.dump(SVM, output_svm_model_path)
@@ -130,14 +128,13 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
                 loss = loss.to(device)
                 val_loss += loss.item()
 
-                if include_additional_features:
-                    features = torch.cat((features, additional_features), 1)
-
                 if device != "cpu":
                     features = features.cpu()
                     labels = labels.cpu()
+                if include_additional_features:
+                    features = np.concatenate((features, additional_features), axis=1)
 
-                logits = SVM.predict(features.numpy())
+                logits = SVM.predict(features)
                 val_metrics = metrics_sklearn(logits, labels.numpy().flatten())
                 val_accuracy += val_metrics[0]
                 val_f1_0 += val_metrics[1]
