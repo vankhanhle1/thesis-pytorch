@@ -1,8 +1,9 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from nltk.tokenize import word_tokenize
 from rouge_score import rouge_scorer
 
-from data_helpers import remove_special_characters, StopWordsRemoval, Word2Vec, extract_mt_features
+from data_helpers import remove_special_characters, Word2Vec, extract_mt_features
 
 
 class Data:
@@ -13,26 +14,22 @@ class Data:
         self.embedded = []
         self.max_len = max_len
         self.terp_path = ''
+        self.badger_path = ''
 
     def open_and_preprocess(self, path, mode):
         print("Removing special chars & stopwords")
         df = pd.read_csv(path + mode + "-df.csv")
-        self.terp_path = path + "terp\\" + mode + "\\msrp.seg.csv"
+        self.terp_path = path + "sgm\\" + mode + "\\output\\terp\\" + mode + ".seg.csv"
+        self.badger_path = path + "sgm\\" + mode + "\\output\\SmithWatermanGotohWindowedAffine\\Badger-seg.csv"
         for i in range(len(df)):
-            s0_original, s1_original = df.iloc[i, 0], df.iloc[i, 1]
-            self.original.append([s0_original, s1_original])
-            s0 = remove_special_characters(s0_original)
-            s1 = remove_special_characters(s1_original)
+            # s0_original, s1_original = df.iloc[i, 0], df.iloc[i, 1]
+            s0, s1 = remove_special_characters(df.iloc[i, 0]), remove_special_characters(df.iloc[i, 1])
+            self.original.append([s0, s1])
+            s0_tokens = word_tokenize(s0)
+            s1_tokens = word_tokenize(s1)
             score = df.iloc[i, 2]
-            self.processed.append([s0, s1, score])
-            local_max_len = max(len(s0), len(s1))
-
-            # s0 = stop_words_removal.remove_stopwords(s0_original)
-            # s1 = stop_words_removal.remove_stopwords(s1_original)
-            # score = df.iloc[i, 2]
-            # self.processed.append([s0, s1, score])
-            # local_max_len = max(len(s0), len(s1))
-
+            self.processed.append([s0_tokens, s1_tokens, score])
+            local_max_len = max(len(s0_tokens), len(s1_tokens))
             if local_max_len > self.max_len:
                 self.max_len = local_max_len
 
@@ -41,6 +38,8 @@ class Data:
         embed = Word2Vec()
         rouge = rouge_scorer.RougeScorer(['rouge1', 'rouge2'])
         terp = pd.read_csv(self.terp_path)
+        badger = pd.read_csv(self.badger_path)
+
         print("Getting embeddings")
         for i in range(len(self.processed)):
             if (i + 1) % 100 == 0:
@@ -57,6 +56,9 @@ class Data:
             # TERp
             additional_features_01.append(terp.iloc[i * 2, 1])
             additional_features_10.append(terp.iloc[i * 2 + 1, 1])
+            # BADGER
+            additional_features_01.append(badger.iloc[i * 2, 1])
+            additional_features_10.append(badger.iloc[i * 2 + 1, 1])
             # sentence lengths
             additional_features_01.append(len(s0))
             additional_features_01.append(len(s1))

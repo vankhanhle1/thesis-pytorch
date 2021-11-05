@@ -10,7 +10,7 @@ from nltk.translate.nist_score import sentence_nist
 
 
 def remove_special_characters(x):
-    return word_tokenize(re.sub('[^A-Za-z0-9 ]+', ' ', x))
+    return re.sub('[$@&<>]', ' ', x)
 
 
 class StopWordsRemoval():
