@@ -11,11 +11,11 @@ from train_helpers import from_pickle_to_dataloader, load_checkpoint, save_check
 
 
 def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_size,
-          d0, sentence_length, filter_width, conv_layers_count, conv_kernels_count, activation_fn, loss_fn,
+          filter_width, conv_layers_count, conv_kernels_count, activation_fn, loss_fn,
           include_input_ap, include_additional_features, l2_reg, lr, decay_step_size, device, output_dnn_model_path,
           output_svm_model_path, output_metrics_path, resume_training, input_dnn_model_path='',
           input_svm_model_path='', input_metrics_path=''):
-    train_loader = from_pickle_to_dataloader(train_data_path, batch_size)
+    train_loader, sentence_length, d0 = from_pickle_to_dataloader(train_data_path, batch_size, True)
     val_loader = from_pickle_to_dataloader(val_data_path, batch_size)
 
     model = ABCNN(model_type, d0, sentence_length, filter_width, conv_layers_count, conv_kernels_count, activation_fn,
@@ -31,8 +31,9 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
         start_epoch = 0
         model.apply(weights_init)
         SVM = svm_fn
-        metrics_df = pd.DataFrame(columns=['epoch', 'train_loss', 'train_accuracy', 'train_f1_0', 'train_f1_1',
-                         'val_loss', 'val_accuracy', 'val_f1_0', 'val_f1_1'])
+        metrics_df = pd.DataFrame(
+            columns=['epoch', 'train_loss', 'train_accuracy', 'train_f1_0', 'train_f1_1', 'train_f1_weighted',
+                     'val_loss', 'val_accuracy', 'val_f1_0', 'val_f1_1', 'val_f1_weighted'])
 
     train_total_batch = len(train_loader)
     val_total_batch = len(val_loader)
@@ -96,7 +97,8 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
 
         SVM.fit(svm_features, svm_labels)
         train_logits = SVM.predict(svm_features)
-        epoch_train_accuracy, epoch_train_f1_0, epoch_train_f1_1 = metrics_sklearn(train_logits, svm_labels)
+        epoch_train_accuracy, epoch_train_f1_0, epoch_train_f1_1, epoch_train_f1_weighted = metrics_sklearn(
+            train_logits, svm_labels)
 
         joblib.dump(SVM, output_svm_model_path)
 
@@ -104,6 +106,7 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
         logs['accuracy'] = epoch_train_accuracy
         logs['f1_class_0'] = epoch_train_f1_0
         logs['f1_class_1'] = epoch_train_f1_1
+        logs['f1_weighted'] = epoch_train_f1_weighted
 
         model.eval()
         with torch.no_grad():
@@ -111,6 +114,7 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
             val_accuracy = 0.0
             val_f1_0 = 0.0
             val_f1_1 = 0.0
+            val_f1_weighted = 0.0
 
             for X, Y in val_loader:
                 x0 = X[:, 0, :, :].unsqueeze(1)
@@ -139,32 +143,36 @@ def train(train_data_path, val_data_path, model_type, svm_fn, epoch_size, batch_
                 val_accuracy += val_metrics[0]
                 val_f1_0 += val_metrics[1]
                 val_f1_1 += val_metrics[2]
+                val_f1_weighted += val_metrics[3]
 
         epoch_val_loss = float(val_loss / val_total_batch)
         epoch_val_accuracy = float(val_accuracy / val_total_batch)
         epoch_val_f1_0 = float(val_f1_0 / val_total_batch)
         epoch_val_f1_1 = float(val_f1_1 / val_total_batch)
+        epoch_val_f1_weighted = float(val_f1_weighted / val_total_batch)
 
         epoch_metrics = {'epoch': real_epoch,
                          'train_loss': epoch_train_loss,
                          'train_accuracy': epoch_train_accuracy,
                          'train_f1_0': epoch_train_f1_0,
                          'train_f1_1': epoch_train_f1_1,
+                         'train_f1_weighted': epoch_train_f1_weighted,
                          'val_loss': epoch_val_loss,
                          'val_accuracy': epoch_val_accuracy,
                          'val_f1_0': epoch_val_f1_0,
-                         'val_f1_1': epoch_val_f1_1}
+                         'val_f1_1': epoch_val_f1_1,
+                         'val_f1_weighted': epoch_val_f1_weighted}
         metrics_df = metrics_df.append(epoch_metrics, ignore_index=True)
-        metrics_df.to_csv(output_metrics_path,index=False)
+        metrics_df.to_csv(output_metrics_path, index=False)
 
         logs['val_loss'] = epoch_val_loss
         logs['val_accuracy'] = epoch_val_accuracy
         logs['val_f1_class_0'] = epoch_val_f1_0
         logs['val_f1_class_1'] = epoch_val_f1_1
+        logs['val_f1_weighted'] = epoch_val_f1_weighted
 
         liveloss.update(logs)
         liveloss.send()
-
 
 #
 # def continue_train(train_data_path, val_data_path, input_dnn_path, input_svm_path, output_dnn_path, output_svm_path,

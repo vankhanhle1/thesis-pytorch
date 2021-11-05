@@ -40,7 +40,8 @@ def metrics_sklearn(prediction, truth):
     accuracy = report.get('accuracy')
     f1_0 = report.get('0').get('f1-score')
     f1_1 = report.get('1').get('f1-score')
-    return accuracy, f1_0, f1_1
+    f1_weighted = report.get('weighted avg').get('f1-score')
+    return accuracy, f1_0, f1_1, f1_weighted
 
 
 def save_checkpoint(state, path):
@@ -48,7 +49,7 @@ def save_checkpoint(state, path):
     torch.save(state, f_path)
 
 
-def from_pickle_to_dataloader(path, batch_size):
+def from_pickle_to_dataloader(path, batch_size, get_sentence_dimensions=False):
     data = Data()
 
     with open(path, 'rb') as file:
@@ -58,12 +59,15 @@ def from_pickle_to_dataloader(path, batch_size):
     ready_data = list(map(list, zip(*data.embedded)))
     x = [np.array(ready_data[0]), np.array(ready_data[1])]
     y = np.array(ready_data[2])
-
     tensor_x = torch.Tensor(x).permute(1, 0, 3, 2)
     tensor_y = torch.Tensor(y)
     tensor_dataset = TensorDataset(tensor_x, tensor_y)
     data_loader = DataLoader(dataset=tensor_dataset, batch_size=batch_size, shuffle=True)
-    return data_loader
+    if get_sentence_dimensions:
+        sentence_length, d0 = len(x[0][0][0]), len(x[0][0])
+        return data_loader, sentence_length, d0
+    else:
+        return data_loader
 
 
 def pearson_correlation_coefficient(prediction, target):
