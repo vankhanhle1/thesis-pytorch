@@ -12,6 +12,9 @@ from nltk.translate.nist_score import sentence_nist
 def remove_special_characters(x):
     return re.sub('[$@&<>]', ' ', x)
 
+def remove_all_non_alphanumeric(x):
+    return re.sub('[^A-Za-z0-9 ]+', ' ', x)
+
 
 class StopWordsRemoval():
     def __init__(self):
@@ -38,7 +41,6 @@ class Word2Vec():
             word_embedded = self.model.get_vector(word)
         return word_embedded
 
-
 def extract_mt_features(reference, hypothesis, rouge):
     scores = []
     reference_token = word_tokenize(reference)
@@ -49,7 +51,12 @@ def extract_mt_features(reference, hypothesis, rouge):
         scores.append(sentence_bleu(reference_token, hypothesis_token, weights))
 
     for n_gram in range(1, 6):
-        scores.append(sentence_nist(reference_token, hypothesis_token, n_gram))
+        try:
+            nist = sentence_nist(reference_token, hypothesis_token, n_gram)
+        except ZeroDivisionError:
+            print('error')
+            nist = 0
+        scores.append(nist)
 
     scores.append(single_meteor_score(reference, hypothesis))
     rouge_scores = rouge.score(reference, hypothesis)

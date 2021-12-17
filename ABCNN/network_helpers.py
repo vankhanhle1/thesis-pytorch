@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class AllAP(nn.Module):
     def forward(self, x):  # shape (batch_size, 1, max_length + width - 1, height)
         pool_width = x.shape[2]
@@ -22,16 +21,16 @@ class WidthAP(nn.Module):
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, sentence_length, conv_kern_count, filter_width, d0, activation_fn, model_type):
+    def __init__(self, sentence_length, conv_kern_count, filter_width, d0, model_type):
         super(ConvBlock, self).__init__()
         self.model_type = model_type
         if model_type == "ABCNN1" or model_type == "ABCNN3":
-            self.conv = nn.Conv2d(2, conv_kern_count, kernel_size=(filter_width, d0), stride=1,
+            self.conv = nn.Conv2d(2, conv_kern_count, kernel_size=(filter_width,d0), stride=1,
                                   padding=(filter_width - 1, 0))
         else:
-            self.conv = nn.Conv2d(1, conv_kern_count, kernel_size=(filter_width, d0), stride=1,
+            self.conv = nn.Conv2d(1, conv_kern_count, kernel_size=(filter_width,d0), stride=1,
                                   padding=(filter_width - 1, 0))
-        self.activation_fn = activation_fn
+        self.activation_fn = Tanh()
         self.wp = WidthAP(filter_width)
         self.ap = AllAP()
         self.attn1 = AttentionConvInput(d0, sentence_length)
@@ -74,18 +73,16 @@ def create_attention_matrix(x0, x1):
 class AttentionConvInput(nn.Module):
     def __init__(self, input_size, sentence_length):
         super(AttentionConvInput, self).__init__()
-        W0 = nn.Parameter(torch.Tensor(sentence_length, input_size))
-        W1 = nn.Parameter(torch.Tensor(sentence_length, input_size))
-        self.W0 = W0
-        self.W1 = W1
+        W = nn.Parameter(torch.Tensor(sentence_length, input_size))
+        self.W = W
 
     def forward(self, x0, x1):  # shape (batch_size, 1, max_length, input_size)
         A = create_attention_matrix(x0, x1)
-        A = A.cuda() if self.W1.is_cuda else A
+        A = A.cuda() if self.W.is_cuda else A
         A_t = A.permute(0, 1, 3, 2)
 
-        a0 = torch.matmul(A, self.W0)
-        a1 = torch.matmul(A_t, self.W1)
+        a0 = torch.matmul(A, self.W)
+        a1 = torch.matmul(A_t, self.W)
 
         f0 = torch.cat([x0, a0], dim=1)
         f1 = torch.cat([x1, a1], dim=1)
@@ -128,5 +125,4 @@ def weights_init(m):
         nn.init.xavier_normal_(m.weight)
         nn.init.constant_(m.bias, 0)
     elif classname.find("AttentionConvInput") != -1:
-        nn.init.xavier_normal_(m.W0)
-        nn.init.xavier_normal_(m.W1)
+        nn.init.xavier_normal_(m.W)
