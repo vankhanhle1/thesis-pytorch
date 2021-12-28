@@ -114,15 +114,3 @@ class AttentionWPooling(nn.Module):
                 wp0[:, :, j, :] += row_sum * x0[:, :, k, :]
                 wp1[:, :, j, :] += col_sum * x1[:, :, k, :]
         return wp0, wp1  # shape (batch_size, 1, max_length, output_size)
-
-
-def weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find("Conv2d") != -1:
-        nn.init.xavier_normal_(m.weight)
-        nn.init.constant_(m.bias, 0)
-    elif classname.find("Linear") != -1:
-        nn.init.xavier_normal_(m.weight)
-        nn.init.constant_(m.bias, 0)
-    elif classname.find("AttentionConvInput") != -1:
-        nn.init.xavier_normal_(m.W)

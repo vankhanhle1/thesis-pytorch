@@ -10,7 +10,7 @@ from torch.nn import BCELoss
 
 from model import ABCNN
 from network_helpers import weights_init
-from train_helpers import from_pickle_to_dataloader, load_checkpoint, save_checkpoint, metrics_sklearn, predict, \
+from ABCNN.train_helpers import from_pickle_to_dataloader, load_checkpoint, save_checkpoint, metrics_sklearn, predict, \
     EpochSum, update_epoch_metrics, load_checkpoint_for_test
 
 

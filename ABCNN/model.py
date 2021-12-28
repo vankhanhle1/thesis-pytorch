@@ -30,7 +30,7 @@ class ABCNN(nn.Module):
             self.fc_input_shape += d0
         self.fc = nn.Linear(self.fc_input_shape, 1)
 
-    def forward(self, x0, x1, x2=0):
+    def forward(self, x0, x1, external_features=0):
         scores = []
         if (self.include_input_ap):
             input_a0, input_a1 = self.ap(x0), self.ap(x1)
@@ -40,7 +40,7 @@ class ABCNN(nn.Module):
             score = euclidean_similarity_score(a0, a1)
             scores.append(euclidean_similarity_score(a0, a1))
         features = torch.cat(scores, dim=1)
-        if not self.combine_with_svm and type(x2) != int:
-            features = torch.cat([features, x2], dim=1)
+        if not self.combine_with_svm and type(external_features) != int:
+            features = torch.cat([features, external_features], dim=1)
         output = torch.sigmoid(self.fc(features))
         return output, features

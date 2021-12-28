@@ -2,6 +2,7 @@ import pickle
 
 import numpy as np
 import torch
+import torch.nn as nn
 from sklearn.metrics import classification_report
 from torch.utils.data import TensorDataset, DataLoader
 
@@ -92,8 +93,8 @@ def update_epoch_metrics(epoch_sum, total_batch, logs, epoch_metrics, prefix='')
 
 
 def predict(X, Y, device, include_additional_features, model, loss_fn, threshold, epoch_sum, mode, optimizer):
-    x0 = X[:, 0, :, :].unsqueeze(1)
-    x1 = X[:, 1, :, :].unsqueeze(1)
+    x0 = X[:, 0, :, :].permute(0, 2, 1)
+    x1 = X[:, 1, :, :].permute(0, 2, 1)
 
     x0 = x0.to(device)
     x1 = x1.to(device)
@@ -102,11 +103,11 @@ def predict(X, Y, device, include_additional_features, model, loss_fn, threshold
         x2 = additional_features.to(device)
         labels = Y[:, -1].unsqueeze(1)
     else:
-        x2 = 0
-        labels = Y.unsqueeze(1)
+        x2 = None
+        labels = Y[:, -1].unsqueeze(1)
     labels = labels.to(device)
 
-    predictions, features = model(x0, x1, x2)
+    predictions = model(x0, x1, ext_feats=x2)
     loss = loss_fn(predictions.float(), labels)
     loss = loss.to(device)
 
@@ -147,3 +148,13 @@ class EpochSum():
         self.recall_0 += recall_0
         self.recall_1 += recall_1
         self.f1_weighted += f1_weighted
+
+
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find("Conv2d") != -1:
+        nn.init.xavier_normal_(m.weight)
+        nn.init.constant_(m.bias, 0)
+    elif classname.find("Linear") != -1:
+        nn.init.xavier_normal_(m.weight)
+        nn.init.constant_(m.bias, 0)
